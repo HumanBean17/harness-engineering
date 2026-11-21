@@ -3,382 +3,189 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Практический опыт построения harness для ИИ-агентов в mission-critical brownfield-проекте: навигация, состояние, верификация и саморефлексия.">
-  <meta name="theme-color" content="#101d26">
+  <meta name="description" content="Опыт построения среды для ИИ-агентов в mission-critical brownfield-проекте: навигация, состояние, верификация и работа с вниманием человека.">
+  <meta name="theme-color" content="#ffffff">
   <title>Harness Engineering: как превратить ошибки в опыт</title>
   <style>
-    :root {
-      color-scheme: light;
-      --ink: #15242c;
-      --muted: #52646b;
-      --paper: #f5f7f5;
-      --surface: #ffffff;
-      --deep: #101d26;
-      --deep-2: #182b35;
-      --accent: #087f7a;
-      --accent-light: #b9f1e8;
-      --line: #d8e0df;
-      --code: #eaf0ef;
-      --measure: 72ch;
-    }
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      background: var(--paper);
-      color: var(--ink);
+      background: #ffffff;
+      color: #000000;
       font-family: Charter, "Bitstream Charter", "Sitka Text", Georgia, serif;
-      font-size: 18px;
-      line-height: 1.7;
+      font-size: 19px;
+      line-height: 1.72;
     }
-    a { color: #006d69; text-underline-offset: 3px; }
-    a:hover { color: #004e4b; }
-    a:focus-visible { outline: 3px solid #0aa89f; outline-offset: 4px; border-radius: 2px; }
+    a { color: #000000; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+    a:hover { text-decoration-thickness: 2px; }
+    a:focus-visible { outline: 2px solid #000000; outline-offset: 4px; }
+    ::selection { background: #000000; color: #ffffff; }
     .skip {
-      position: absolute; left: 16px; top: -80px; padding: 10px 16px;
-      background: var(--surface); color: var(--ink); z-index: 2;
+      position: absolute; left: 16px; top: -80px; padding: 8px 12px;
+      background: #ffffff; color: #000000; border: 1px solid #000000;
     }
     .skip:focus { top: 16px; }
-    .hero { background: var(--deep); color: #f2faf8; position: relative; overflow: hidden; }
-    .hero::after {
-      content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .18;
-      background-image: linear-gradient(rgba(185,241,232,.16) 1px, transparent 1px), linear-gradient(90deg, rgba(185,241,232,.16) 1px, transparent 1px);
-      background-size: 48px 48px;
-      mask-image: linear-gradient(90deg, transparent 20%, #000 100%);
+    header, main, footer { width: min(720px, calc(100% - 48px)); margin: 0 auto; }
+    header { padding: 72px 0 48px; border-bottom: 2px solid #000000; }
+    h1, h2, h3, .meta {
+      font-family: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
     }
-    .hero-inner, .layout, .footer-inner { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
-    .hero-inner { padding: 80px 0 72px; position: relative; z-index: 1; }
-    .kicker {
-      margin: 0 0 28px; color: var(--accent-light); font: 700 13px/1.4 Arial, sans-serif;
-      letter-spacing: .14em; text-transform: uppercase;
-    }
-    h1, h2, h3, .sans { font-family: "Arial Narrow", "Helvetica Neue", Arial, sans-serif; }
-    h1 { max-width: 900px; margin: 0; font-size: clamp(42px, 7vw, 82px); line-height: .98; letter-spacing: -.045em; font-weight: 750; }
-    .subtitle { max-width: 720px; margin: 30px 0 0; color: #d5e5e3; font-size: 21px; line-height: 1.55; }
-    .byline { margin-top: 38px; color: #a9c3c2; font: 15px/1.5 Arial, sans-serif; }
-    .layout { display: grid; grid-template-columns: 220px minmax(0, var(--measure)); gap: 72px; justify-content: center; padding: 64px 0 88px; }
-    .toc { align-self: start; position: sticky; top: 24px; font: 14px/1.45 Arial, sans-serif; }
-    .toc strong { display: block; margin-bottom: 14px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
-    .toc ol { list-style: none; padding: 0; margin: 0; }
-    .toc li + li { margin-top: 10px; }
-    .toc a { color: var(--muted); text-decoration: none; }
-    .toc a:hover { color: var(--accent); text-decoration: underline; }
-    article { min-width: 0; }
-    section + section { margin-top: 72px; padding-top: 16px; border-top: 1px solid var(--line); }
-    h2 { margin: 0 0 24px; font-size: clamp(30px, 4vw, 43px); line-height: 1.12; letter-spacing: -.025em; }
-    h3 { margin: 40px 0 16px; font-size: 25px; line-height: 1.2; letter-spacing: -.015em; }
-    p { margin: 0 0 22px; }
-    ul, ol { padding-left: 24px; margin: 0 0 24px; }
-    li + li { margin-top: 8px; }
-    strong { font-weight: 700; }
-    .lead { font-size: 23px; line-height: 1.55; color: #243b43; }
-    blockquote {
-      margin: 34px 0; padding: 26px 28px; background: var(--deep); color: #f2faf8;
-      font: 500 24px/1.4 "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-    }
+    h1 { margin: 0; font-size: clamp(42px, 7vw, 68px); line-height: 1.02; letter-spacing: -.04em; }
+    .standfirst { margin: 28px 0 0; font-size: 23px; line-height: 1.5; }
+    .meta { margin: 28px 0 0; font-size: 14px; line-height: 1.5; letter-spacing: .04em; text-transform: uppercase; }
+    main { padding: 48px 0 72px; }
+    section + section { margin-top: 64px; padding-top: 48px; border-top: 1px solid #000000; }
+    h2 { margin: 0 0 24px; font-size: 34px; line-height: 1.15; letter-spacing: -.02em; }
+    h3 { margin: 40px 0 16px; font-size: 24px; line-height: 1.25; }
+    p { margin: 0 0 24px; }
+    ul, ol { margin: 0 0 24px; padding-left: 25px; }
+    li + li { margin-top: 9px; }
+    blockquote { margin: 36px 0; padding: 0 0 0 24px; border-left: 3px solid #000000; font-size: 24px; line-height: 1.45; }
     blockquote p { margin: 0; }
-    .note { border-left: 3px solid var(--accent); padding: 4px 0 4px 20px; color: #30464e; }
-    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 28px 0; font-family: Arial, sans-serif; }
-    .stat { background: var(--surface); border: 1px solid var(--line); padding: 22px; }
-    .stat b { display: block; color: var(--accent); font-size: 36px; line-height: 1; letter-spacing: -.03em; }
-    .stat span { display: block; margin-top: 10px; font-size: 14px; line-height: 1.45; color: var(--muted); }
-    .diagram { margin: 30px 0; padding: 26px; background: var(--deep); color: #eef8f6; font-family: Arial, sans-serif; }
-    .diagram-title { margin: 0 0 20px; color: var(--accent-light); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-    .flow { display: flex; align-items: stretch; gap: 8px; }
-    .flow > div { flex: 1; padding: 14px; border: 1px solid #49616a; font-size: 14px; line-height: 1.4; }
-    .flow b { display: block; color: var(--accent-light); margin-bottom: 6px; }
-    .arrow { flex: 0 0 auto !important; border: 0 !important; padding: 14px 0 !important; align-self: center; color: var(--accent-light); }
-    .anatomy { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .anatomy div { padding: 18px; background: var(--deep-2); }
-    .anatomy b { display: block; color: var(--accent-light); margin-bottom: 6px; }
-    .anatomy span { color: #cfdfdd; font-size: 14px; }
     pre {
-      margin: 24px 0; padding: 20px; overflow-x: auto; background: var(--code); color: #173038;
-      border: 1px solid var(--line); font: 14px/1.6 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      margin: 28px 0; padding: 20px; overflow-x: auto;
+      background: #ffffff; color: #000000; border: 1px solid #000000;
+      font: 14px/1.6 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     }
     code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: .9em; }
-    p code, li code { background: var(--code); padding: 2px 5px; border-radius: 3px; }
-    .tool-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
-    .tool-head h3 { margin-bottom: 10px; }
-    .tag { color: var(--accent); font: 700 12px/1 Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
-    .resources { padding: 26px; background: var(--surface); border: 1px solid var(--line); }
-    .resources h3 { margin-top: 0; }
-    .resources li { margin-bottom: 10px; }
-    .conclusion { background: var(--deep); color: #eef8f6; padding: 30px; }
-    .conclusion h2 { color: var(--accent-light); }
-    .conclusion p:last-child { margin-bottom: 0; }
-    footer { border-top: 1px solid var(--line); background: var(--surface); }
-    .footer-inner { padding: 28px 0; color: var(--muted); font: 14px/1.6 Arial, sans-serif; }
-    @media (max-width: 900px) {
-      .layout { grid-template-columns: minmax(0, var(--measure)); gap: 32px; }
-      .toc { position: static; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
-      .toc ol { columns: 2; column-gap: 24px; }
-      .toc li { break-inside: avoid; }
-    }
+    p code, li code { padding: 1px 3px; border: 1px solid #000000; }
+    .references { font-size: 17px; }
+    footer { padding: 28px 0 40px; border-top: 2px solid #000000; font: 14px/1.6 Arial, sans-serif; }
     @media (max-width: 560px) {
-      body { font-size: 17px; }
-      .hero-inner, .layout, .footer-inner { width: min(100% - 32px, 1180px); }
-      .hero-inner { padding: 52px 0; }
-      .subtitle { font-size: 19px; }
-      .layout { padding: 36px 0 56px; }
-      .toc ol { columns: 1; }
-      .toc a { display: flex; align-items: center; min-height: 44px; }
-      .toc li + li { margin-top: 0; }
-      section + section { margin-top: 48px; }
-      .lead { font-size: 20px; }
-      blockquote { padding: 22px; font-size: 21px; }
-      .stats, .anatomy { grid-template-columns: 1fr; }
-      .flow { flex-direction: column; }
-      .arrow { transform: rotate(90deg); padding: 0 !important; }
-      .diagram { padding: 20px; }
+      body { font-size: 18px; }
+      header, main, footer { width: calc(100% - 32px); }
+      header { padding: 48px 0 36px; }
+      .standfirst { font-size: 21px; }
+      main { padding: 36px 0 56px; }
+      section + section { margin-top: 48px; padding-top: 36px; }
+      h2 { font-size: 30px; }
+      blockquote { padding-left: 18px; font-size: 22px; }
+      pre { padding: 16px; font-size: 13px; }
     }
     @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
     @media print {
-      .toc, .skip { display: none; }
-      .hero { background: none; color: var(--ink); }
-      .hero::after { display: none; }
-      .subtitle, .byline, .kicker { color: var(--ink); }
-      .layout { display: block; width: 100%; padding: 24px 0; }
-      .hero-inner { padding: 24px 0; }
-      body { background: white; font-size: 11pt; }
-      a { color: inherit; }
+      body { font-size: 11pt; }
+      header, main, footer { width: 100%; }
+      header { padding-top: 0; }
+      .skip { display: none; }
       section { break-inside: avoid; }
     }
   </style>
 </head>
 <body>
-<a class="skip" href="#article">Перейти к статье</a>
-<header class="hero">
-  <div class="hero-inner">
-    <p class="kicker">Агентная разработка · Brownfield · Практический опыт</p>
-    <h1>Harness Engineering:<br>как превратить ошибки в&nbsp;опыт</h1>
-    <p class="subtitle">Как перестать исправлять одни и те же ошибки ИИ-агента и вместо этого улучшить среду, в которой он работает.</p>
-    <p class="byline">Дмитрий Теряев · Java-разработчик · По материалам доклада</p>
-  </div>
+<a class="skip" href="#content">Перейти к тексту</a>
+<header>
+  <h1>Harness Engineering:<br>как превратить ошибки в&nbsp;опыт</h1>
+  <p class="standfirst">Почему качество агентной разработки зависит не только от модели и промптов — и как среда вокруг агента помогает команде накапливать улучшения.</p>
+  <p class="meta">Дмитрий Теряев · Java-разработчик</p>
 </header>
-<div class="layout">
-  <nav class="toc" aria-label="Содержание">
-    <strong>Содержание</strong>
-    <ol>
-      <li><a href="#problem">Документация стала слопом</a></li>
-      <li><a href="#definition">Что такое harness</a></li>
-      <li><a href="#navigation">Карта вместо руководства</a></li>
-      <li><a href="#state">Состояние длинных сессий</a></li>
-      <li><a href="#verification">Доказательства вместо обещаний</a></li>
-      <li><a href="#iteration">Ошибка → опыт</a></li>
-      <li><a href="#attention">Внимание человека</a></li>
-      <li><a href="#conclusion">Главный вывод</a></li>
-    </ol>
-  </nav>
-  <article id="article">
-    <section id="problem">
-      <h2>Я задокументировал всё — стало только хуже</h2>
-      <p class="lead">Наша команда разрабатывает и поддерживает систему, которая обрабатывает коммуникации клиентов с банком: чаты и звонки. Это mission-critical brownfield-проект с запутанным и мёртвым кодом, множеством feature toggles и почти без документации и истории архитектурных решений.</p>
-      <p>Когда я впервые перешёл от общения с ИИ в чате к агентному режиму, результат впечатлил: агент за минуту на 90% правильно ответил на вопрос о части системы, в которой я когда-то разбирался несколько дней. Мы начали внедрять агентную разработку — и быстро увидели обратную сторону.</p>
-      <p>Один и тот же промпт мог дать хороший результат, а в другой сессии превращался в долгое направление агента и пересказ устройства проекта. Ошибку мы исправляли, но в следующий раз она возвращалась в новой форме. Brownfield оказался настоящим испытанием для ИИ.</p>
-      <p>Популярный рецепт звучал просто: агенту нужен контекст, поэтому надо сгенерировать документацию. Мы так и сделали. Сожгли миллионы токенов и получили Java, переведённую на русский язык.</p>
-      <ul>
-        <li><strong>Детализация непредсказуема:</strong> одна строка о бизнес-логике и десять об утилитарном классе.</li>
-        <li><strong>Важным оказалось всё — значит, ничего:</strong> агент всё равно шёл к коду, но уже с переполненным контекстом.</li>
-        <li><strong>Текст невозможно проверить:</strong> правдоподобный пересказ содержал ошибки, на поиск которых ушло бы слишком много времени.</li>
-      </ul>
-      <blockquote><p>Если агент просто прочитал код и сгенерировал документацию, то в чём её ценность? Он и так умеет читать код.</p></blockquote>
-      <p>Автоматически созданное summary — не контекст и не знания. Исследование ETH Zurich <a href="https://arxiv.org/abs/2602.11988">«Evaluating AGENTS.md»</a> подтверждает наш опыт: автоматически сгенерированные контекстные файлы снизили долю успешно выполненных задач и увеличили расход токенов.</p>
-      <div class="stats" aria-label="Результаты исследования ETH Zurich">
-        <div class="stat"><b>−2–3 п. п.</b><span>к доле успешно выполненных задач</span></div>
-        <div class="stat"><b>+20%</b><span>к расходу токенов</span></div>
-      </div>
-      <p>Поэтому мы изменили вопрос. Не «как добавить больше контекста?», а <strong>«что агенту действительно нужно?»</strong></p>
+<main id="content">
+  <article>
+    <section>
+      <p>Когда я начал использовать ИИ-агента в работе над большим Java-проектом, первый результат оказался почти магическим. Агент за минуту разобрался в части системы, на изучение которой у меня когда-то ушло несколько дней. Его ответ был не идеальным, но примерно на 90% верным. Для знакомства с незнакомым кодом этого более чем достаточно.</p>
+      <p>Наша система обрабатывает коммуникации клиентов с банком: чаты и звонки. Это mission-critical brownfield. В ней много запутанного и мёртвого кода, feature toggles и решений, причины которых со временем потерялись. Документации и целостного описания архитектуры почти не было. Знания распределились между кодом, зависимостями, инфраструктурой и людьми.</p>
+      <p>После первого впечатляющего ответа началась обычная работа. И выяснилось, что результат трудно повторить. Тот же запрос в новой сессии мог привести к долгому расследованию, неверному маршруту по коду и необходимости снова объяснять агенту устройство проекта. Мы исправляли ошибку, получали приемлемый результат, закрывали задачу — а потом встречали ту же ошибку в другом месте.</p>
+      <p>Проблема была не в том, что агент ничего не умеет. Как раз наоборот: он умеет достаточно, чтобы быстро найти правдоподобный ответ. Проблема была в том, что каждая сессия начиналась в среде, которая ничему не научилась за предыдущие.</p>
     </section>
 
-    <section id="definition">
-      <h2>Harness — это всё вокруг модели</h2>
-      <p>В феврале 2026 года вышла статья OpenAI <a href="https://openai.com/index/harness-engineering/">«Harness engineering: Codex in an agent-first world»</a>. Вывод о документации совпал с нашим: агенту нужна не тысячестраничная инструкция, а карта и знания, которых нет в коде.</p>
-      <p>Но важнее другое: OpenAI дала название целому слою, который мы до этого пытались улучшать по частям.</p>
-      <div class="diagram">
-        <p class="diagram-title">От инструкции к среде</p>
-        <div class="flow">
-          <div><b>Prompt engineering</b>Инструкция для текущей задачи</div>
-          <div class="arrow">→</div>
-          <div><b>Context engineering</b>Информация в ограниченном окне</div>
-          <div class="arrow">→</div>
-          <div><b>Harness engineering</b>Среда, сохраняющаяся между сессиями</div>
-        </div>
-      </div>
-      <p>Дисциплины пересекаются. Различие — в охвате и накопленном эффекте. Промпт и контекст помогают в рамках одной сессии. Harness переносит улучшения в следующие и делает их доступными всей команде.</p>
-      <p>Сами агенты — Claude Code, GigaCode, Codex и другие — тоже содержат внутренний harness: цикл исполнения и встроенные механизмы инструмента. На него мы не влияем. Наша зона ответственности — <strong>внешний harness</strong>: инструменты, проверки, состояние и рабочие процессы вокруг агента.</p>
-      <div class="diagram">
-        <p class="diagram-title">Анатомия внешнего harness</p>
-        <div class="anatomy">
-          <div><b>Направляющие</b><span>Намерение, инварианты, скиллы, AGENTS.md и docs/ — повышают шанс на правильное действие.</span></div>
-          <div><b>Инструментарий</b><span>CLI, MCP и bash — расширяют возможности и сокращают путь к результату.</span></div>
-          <div><b>Состояние</b><span>План, прогресс, память и решения — переносят опыт между сессиями.</span></div>
-          <div><b>Сенсоры</b><span>Компилятор, линтер, тесты и ревью — дают обратную связь.</span></div>
-        </div>
-      </div>
-      <p>Классификация условна: компилятор одновременно сенсор и инструмент, память — и направляющая, и состояние. Важно не название категории, а возможность системно менять окружение.</p>
+    <section>
+      <h2>Документация, которая мешает</h2>
+      <p>Первым решением стал модный на тот момент совет: раз агенту не хватает контекста, нужно сгенерировать документацию. Мы потратили миллионы токенов и получили обширное описание проекта. По сути это была Java, переведённая на русский язык.</p>
+      <p>Такой текст создавал убедительную иллюзию полноты. Но детализация распределялась случайно: важная бизнес-логика могла быть описана одной фразой, а небольшой утилитарный класс — десятью абзацами. В документации было важно всё, поэтому на практике не было важно ничто. Агенту всё равно приходилось обращаться к исходникам, только теперь он делал это с контекстным окном, уже заполненным пересказом кода.</p>
+      <p>Оставалась и проблема доверия. Объёмный естественный текст выглядит убедительно даже тогда, когда содержит неточности. Проверить его можно только одним способом — снова прочитать код и сопоставить с описанием. То есть выполнить работу, которую документация якобы должна была сэкономить.</p>
+      <blockquote><p>Если агент сам прочитал код и написал по нему summary, какую новую ценность мы ему передали?</p></blockquote>
+      <p>Позже я нашёл подтверждение своему опыту в исследовании ETH Zurich <a href="https://arxiv.org/abs/2602.11988">«Evaluating AGENTS.md»</a>. Автоматически сгенерированные контекстные файлы в эксперименте снизили долю успешно выполненных задач на 2–3 процентных пункта и увеличили расход токенов на 20%. Для нас это была не статистическая странность, а точное описание произошедшего.</p>
+      <p>Из этого не следует, что документация агенту не нужна. Следует другое: копия кодовой базы на естественном языке не заменяет знания. Ценность появляется там, где документ сохраняет то, что нельзя надёжно восстановить из кода: назначение компонента, причины решения, границы ответственности и устойчивые связи.</p>
     </section>
 
-    <section id="navigation">
-      <h2>Дайте агенту карту, а не многостраничное руководство</h2>
-      <p>Агенты умеют читать и понимать код. Но в крупном brownfield этого мало: значимая логика находится в зависимостях, отправная точка неизвестна, межсервисные связи раскиданы по системе, а неизменные части приходится изучать заново.</p>
-
-      <div class="tool-head"><h3>jarpeek</h3><span class="tag">Исходники зависимостей</span></div>
-      <p>В Java- и Kotlin-проектах архивы с исходниками уже лежат в <code>~/.m2</code> или Gradle cache. Агент может найти и декомпилировать их сам, но каждый раз тратит время и контекст. А обычная декомпиляция сначала возвращает весь класс, и только потом агент ищет нужный фрагмент.</p>
-      <p><a href="https://github.com/HumanBean17/jarpeek">jarpeek</a> меняет порядок: сначала компактный outline, затем ровно один нужный метод — с Javadoc и реализацией.</p>
-      <pre><code>$ jarpeek outline org.springframework.util.StringUtils \
-    --kind method --visibility public --no-javadoc
-
-public static boolean hasText();
-...
-public static String cleanPath(String);
-
-$ jarpeek read-member org.springframework.util.StringUtils \
-    '#cleanPath(java.lang.String)'</code></pre>
-      <p>Полный <code>StringUtils</code> занимает 1 393 строки, выбранный <code>cleanPath</code> — 87. Агент видит только нужное. А Javadoc предупреждает, что метод нормализует путь, но не защищает от path traversal: по одной сигнатуре этого не понять.</p>
-
-      <div class="tool-head"><h3>jrag</h3><span class="tag">Навигация по системе</span></div>
-      <p>Grep плохо помогает, когда контекст не задан явно, реализация раскидана по системе или нужно восстановить полный поток выполнения. <a href="https://github.com/HumanBean17/jrag">jrag</a> объединяет нечёткий поиск и AST-граф: сначала находит компоненту по смыслу, затем детерминированно идёт по связям кода.</p>
-      <pre><code>$ jrag search 'перевод чата другому оператору' --limit 5
-ChatManagementService @chat-assign role=SERVICE
-
-$ jrag callees '...ChatManagementService#transfer' --depth 1
-ChatCoreJoinClient#joinOperator @chat-assign
-
-$ jrag flow /chat/joinOperator --depth 2
-ChatCoreJoinClient#joinOperator @chat-assign
-FollowUpKafkaPublisher#publishIncoming @chat-core</code></pre>
-      <p>Это уже не догадка по именам, а маршрут по коду: от промпта на русском языке к сервису, HTTP-клиенту, другому микросервису и событию Kafka. Инструмент не заменяет <code>grep</code>, <code>glob</code> и <code>find</code>, а дополняет их.</p>
-
-      <div class="tool-head"><h3>docs/</h3><span class="tag">Минимальный индекс</span></div>
-      <p>Даже с инструментами навигации агент повторно изучал одни и те же устойчивые части проекта. Решением стал не пересказ кодовой базы, а небольшой набор проверенных контекстных файлов.</p>
-      <ul>
-        <li>Описываем <strong>что, почему и где</strong>, но не «как» — реализация уже есть в коде.</li>
-        <li>Фиксируем публичные классы, enum, API, устойчивые компоненты и решения.</li>
-        <li>Ограничиваем документ 100–150 строками.</li>
-        <li>Проверяем человеком, а обновляем агентом в конце сессии по diff.</li>
-      </ul>
-      <p class="note">Наше правило — не «никаких контекстных файлов», а «никаких автоматически сгенерированных и непроверенных копий кодовой базы в Markdown». Документы появлялись постепенно, когда мы замечали повторяющуюся проблему.</p>
+    <section>
+      <h2>От контекста к среде</h2>
+      <p>В феврале 2026 года OpenAI опубликовала статью <a href="https://openai.com/index/harness-engineering/">«Harness engineering: Codex in an agent-first world»</a>. В ней был сформулирован подход, который объединил наши разрозненные попытки улучшить агентную разработку.</p>
+      <p>Prompt engineering отвечает на вопрос, какую инструкцию дать модели. Context engineering — какую информацию поместить в ограниченное контекстное окно. Harness engineering смотрит шире: в какой среде агент выполняет работу, как получает обратную связь, какие инструменты ему доступны и что сохраняется после завершения сессии.</p>
+      <p>Эти дисциплины не соперничают и не имеют строгих границ. Но у harness есть важное свойство: он переживает отдельный запрос. Хороший промпт помогает один раз. Проверка, инструмент или сохранённое решение продолжают помогать в следующих задачах и другим членам команды.</p>
+      <p>Внутри самих инструментов — Claude Code, GigaCode, Codex и других — уже есть собственный harness: цикл исполнения, механизмы вызова инструментов, сжатие контекста. Разработчик продукта отвечает за этот внутренний слой. Команда может проектировать внешний: рабочие процессы, CLI и MCP, проверки, инструкции, документацию и состояние выполнения.</p>
+      <p>Такой взгляд изменил нашу реакцию на ошибку. Раньше мы спрашивали: «Как поправить ответ агента?» Теперь сначала стараемся спросить: «Что в окружении позволило этой ошибке произойти и что должно измениться перед следующим запуском?»</p>
     </section>
 
-    <section id="state">
-      <h2>Контекст — ненадёжное хранилище состояния</h2>
-      <p>Агент уже мог решить задачу, но реальная работа не помещалась в одну сессию. Спецификация фиксирует, что должно получиться, но не хранит состояние исполнения: какие задачи завершены, какие решения приняты, какие коммиты проверены и с какого места продолжать.</p>
-      <p>Для намерения и спецификации мы используем OpenSpec, для реализации — Superpowers: план, изолированный worktree, субагенты, TDD, ревью и финальные проверки.</p>
-      <div class="diagram">
-        <p class="diagram-title">Намерение и исполнение</p>
-        <div class="flow">
-          <div><b>OpenSpec</b>Что должно получиться</div>
-          <div class="arrow">→</div>
-          <div><b>Superpowers</b>План · TDD · ревью · коммиты</div>
-          <div class="arrow">→</div>
-          <div><b>Сохранённое состояние</b>Прогресс · решения · история правок</div>
-        </div>
-      </div>
-      <p>Перезапуск, сжатие контекста или ошибка harness больше не обнуляют работу: новая сессия начинается с сохранённого места.</p>
+    <section>
+      <h2>Сократить путь к истине</h2>
+      <p>В большом проекте чтение кода — только часть задачи. Сначала нужно понять, какой код читать и где заканчивается граница репозитория.</p>
+      <p>Значительная часть логики Java- и Kotlin-систем находится в зависимостях. Исходники обычно уже лежат в локальном Maven- или Gradle-кэше, но путь до нужного фрагмента может быть длинным: найти нужную версию архива, получить sources, при их отсутствии декомпилировать класс, затем выбрать один метод из сотен строк.</p>
+      <p>Для этого я написал <a href="https://github.com/HumanBean17/jarpeek">jarpeek</a>. Инструмент сначала показывает компактный outline класса, а затем позволяет прочитать ровно один метод вместе с реализацией и Javadoc. Например, полный <code>StringUtils</code> из Spring занимает 1 393 строки, а нужный нам <code>cleanPath</code> — 87. При этом Javadoc содержит существенное предупреждение: метод нормализует путь, но не предназначен для защиты от path traversal. Сигнатура сама по себе этого не сообщает.</p>
+      <p>Другая задача — найти отправную точку, когда известен только смысл запроса. Обычный поиск по строкам плохо помогает, если пользователь не знает имени класса, а выполнение запроса проходит через несколько сервисов, HTTP и Kafka.</p>
+      <p><a href="https://github.com/HumanBean17/jrag">jrag</a> сочетает нечёткий поиск с AST-графом. По запросу «перевод чата другому оператору» можно найти сервис, затем перейти к вызываемому HTTP-клиенту, восстановить маршрут запроса и увидеть публикацию события. Нечёткий поиск сужает пространство, а граф позволяет идти уже по конкретным связям, а не по догадкам из имён.</p>
+      <p>Но даже хорошая навигация не отменяет повторного изучения устойчивых частей системы. Поэтому у нас остались контекстные документы — немногочисленные и намеренно короткие. Они описывают, что делает компонент, зачем он существует и где его искать, но не пересказывают реализацию. Обычно это 100–150 строк о публичных классах, API, enum и устойчивых решениях. Человек проверяет документ, а агент обновляет его по итоговому diff.</p>
+      <p>Мы перестали создавать худшую копию кода в Markdown. Вместо этого стали строить более короткий путь к самому коду и к знаниям, которых в нём нет.</p>
     </section>
 
-    <section id="verification">
-      <h2>«Все тесты зелёные» — ещё не доказательство</h2>
-      <p>Реализация и тесты могут содержать одну и ту же ошибку. У агента эта проблема выражена сильнее: код и тесты написаны в одном контексте, одним рассуждением. Юнит-тест проверяет модель кода, которую агент и так держит в голове. Настоящее доказательство работоспособности — поведение системы end to end.</p>
-      <p>Для этого появился <a href="https://github.com/HumanBean17/agctl">agctl</a> — единый интерфейс тестирования для агента и человека. Узкий командный контракт проходит через границы системы: HTTP, Kafka, база данных, gRPC и логи.</p>
-      <div class="diagram">
-        <p class="diagram-title">Действие → событие → состояние</p>
-        <div class="flow">
-          <div><b>HTTP request</b>Создать заказ</div>
-          <div class="arrow">→</div>
-          <div><b>Kafka event</b>orders.created</div>
-          <div class="arrow">→</div>
-          <div><b>Database row</b>status = PENDING</div>
-        </div>
-      </div>
-      <pre><code>$ agctl http call create-order \
-    --param customer_id=cust-42 --param sku=WIDGET-001
-
-$ agctl kafka assert --topic orders.created \
-    --contains '{"customer_id": "cust-42"}' --timeout 10
-
-$ agctl db assert --template find-order --param orderId=ord-789 \
-    --expect-value --path ".status" --equals "PENDING"</code></pre>
-      <p>Каждая команда возвращает машиночитаемый JSON. Агенту не нужно отдельно разбирать <code>curl</code>, писать Kafka-consumer или придумывать SQL. Он вызывает действие, получает подтверждение события и проверяет состояние. Человек видит ту же последовательность.</p>
-      <h3>Стенд как конфигурация</h3>
-      <p>Агент не просто запускает готовые тесты. Он сам описывает среду в <code>agctl.yaml</code>: адреса сервисов, шаблоны запросов, паттерны событий, SQL-запросы, seed и моки. Стенд собирается под конкретную задачу и становится таким же важным артефактом, как код.</p>
-      <h3>Runbook и фактические улики</h3>
-      <p>Сценарий проверки сохраняется в <code>runbook.md</code>: цель, предусловия, шаги, команды и ожидаемые результаты. После прогона появляется <code>runbook.results.md</code> с дословной командой, кодом выхода, статусом и фактическим результатом каждого шага.</p>
-      <div class="diagram">
-        <p class="diagram-title">Три артефакта верификации</p>
-        <div class="flow">
-          <div><b>agctl.yaml</b>Среда</div>
-          <div class="arrow">→</div>
-          <div><b>runbook.md</b>Сценарий</div>
-          <div class="arrow">→</div>
-          <div><b>runbook.results.md</b>Доказательства</div>
-        </div>
-      </div>
-      <p>«Готово, тесты зелёные» — утверждение агента. Runbook и отчёт — сценарий и доказательства, которые может проверить человек. Но поведенческое доказательство не отменяет ревью: тестирование отвечает, правильно ли ведёт себя система, а ревью — правильное ли решение мы выбрали.</p>
+    <section>
+      <h2>Работа длиннее контекстного окна</h2>
+      <p>Даже когда агент способен выполнить отдельную задачу, реальная разработка редко помещается в одну сессию. Контекстное окно нельзя считать надёжным хранилищем прогресса. Перезапуск, ошибка инструмента или сжатие контекста могут уничтожить не только текст разговора, но и понимание того, что уже было сделано.</p>
+      <p>Спецификация здесь необходима, но недостаточна. Она фиксирует намерение: какой результат должен получиться. Для исполнения нужно другое состояние — какие задачи завершены, какие решения приняты, какие коммиты созданы, какие проверки пройдены и откуда продолжать.</p>
+      <p>Мы используем OpenSpec для спецификации и Superpowers для реализации. Во втором появляются план, изолированный worktree, TDD, ревью и история выполнения. Коммиты и сохранённые решения становятся внешней памятью работы. Если основной агент завершился с ошибкой, новая сессия может продолжить не с воспоминаний в чате, а с зафиксированного состояния.</p>
+      <p>Это разделение важно и концептуально: намерение не должно растворяться в журнале действий, а прогресс не должен существовать только в памяти модели.</p>
     </section>
 
-    <section id="iteration">
-      <h2>Мы ничего не проектировали заранее</h2>
-      <p>Основная цель harness — повысить автономию. Основной симптом слабого harness — человеческое вмешательство. Даже если агент работал час, а вы потом 30 минут удаляли слоп-комментарии и тесты-пустышки, это тоже симптом.</p>
-      <p>Полезно различать три контура: во внутреннем агент пишет код и запускает проверки; в среднем человек исправляет результат текущей сессии; во внешнем меняет сам harness. Каждое повторяющееся «нет, не так» — баг-репорт против harness.</p>
-      <div class="diagram">
-        <p class="diagram-title">Четыре шага от ошибки к опыту</p>
-        <div class="flow">
-          <div><b>1. Обнаружить</b>Найти исходный симптом</div>
-          <div class="arrow">→</div>
-          <div><b>2. Диагностировать</b>Отделить причину от симптома</div>
-          <div class="arrow">→</div>
-          <div><b>3. Изменить</b>Внести минимальную правку</div>
-          <div class="arrow">→</div>
-          <div><b>4. Проверить</b>Сравнить следующий запуск</div>
-        </div>
-      </div>
-      <p>Чтобы агент помогал находить проблемы, я сделал скилл саморефлексии в конце сессии. Он анализирует опыт и перечисляет трудности: поиск, двусмысленные комментарии, устаревшую документацию, flaky-тесты. Повторяющиеся проблемы становятся основанием для изменения harness.</p>
-      <h3>Пример: одна строка вместо полной сборки</h3>
-      <p>Агенты постоянно испытывали проблемы с запуском тестов, но сообщали об успехе. Внешние симптомы — долгое выполнение и переполнение контекста. Саморефлексия выделила причину: агент запускал тесты одного Maven-модуля без <code>-am</code>.</p>
-      <p>Проект использовал <code>${revision}</code> без flattened-maven-plugin, поэтому Maven не мог разрешить parent-pom вне реактора. Получив ошибку, агент откатывался на полную сборку — отсюда время и контекст.</p>
+    <section>
+      <h2>Доверие требует наблюдаемых доказательств</h2>
+      <p>Следующим ограничением стала верификация. Сообщение «готово, все тесты зелёные» само по себе почти ничего не доказывает. Реализация и тесты могут повторять одну ошибку. У агента этот риск особенно высок: и код, и тесты часто возникают в одном контексте и разделяют одну неверную модель поведения.</p>
+      <p>Юнит-тесты полезны, но проверяют внутренние предположения о коде. Для подтверждения работоспособности нужно наблюдать систему снаружи: вызвать действие, дождаться downstream-события и проверить состояние.</p>
+      <p>Так появился <a href="https://github.com/HumanBean17/agctl">agctl</a> — общий командный интерфейс для агента и человека. Он работает через границы системы: HTTP, Kafka, базу данных, gRPC и логи. Вместо свободного сочетания <code>curl</code>, самописного consumer и SQL агент получает узкий контракт с машиночитаемым результатом.</p>
+      <pre><code>Действие: HTTP-запрос на создание заказа
+Событие:  orders.created в Kafka
+Состояние: заказ в базе имеет статус PENDING</code></pre>
+      <p>Агент не только выполняет проверки, но и собирает стенд. В <code>agctl.yaml</code> он описывает адреса сервисов, шаблоны запросов, события, SQL-запросы, seed и моки недоступных зависимостей. Среда становится воспроизводимым артефактом, а не временной ручной настройкой.</p>
+      <p>Сценарий проверки сохраняется в runbook: цель, предусловия, команды и ожидаемый результат каждого шага. После прогона появляется отчёт с фактическими командами, кодами выхода и наблюденными результатами. Человек может ревьюить не только тестовый код, но и сам сценарий: какое поведение проверялось и какие доказательства получены.</p>
+      <p>При этом тестирование и ревью не подменяют друг друга. Первое показывает, что система ведёт себя ожидаемо. Второе помогает понять, правильное ли решение выбрано, можно ли его поддерживать и как оно меняет архитектуру.</p>
+    </section>
+
+    <section>
+      <h2>Опыт появляется между сессиями</h2>
+      <p>Главной целью нашего harness стала автономия. Поэтому основным симптомом его слабости оказалось человеческое вмешательство — не только во время работы агента, но и после неё. Если агент час писал код, а затем разработчик полчаса удалял ненужные комментарии и вычищал формальные тесты, автономии всё равно не возникло.</p>
+      <p>Можно выделить три контура работы. Во внутреннем агент пишет код и запускает проверки. В среднем человек направляет текущую сессию и исправляет её результат. Во внешнем команда меняет среду: добавляет проверку, уточняет инструкцию, создаёт инструмент или переписывает контекстный документ. Без внешнего контура средний будет занимать всё больше времени.</p>
+      <p>Мы не проектировали harness заранее. У каждого его элемента есть конкретная причина. Цикл выглядит так: заметить исходный симптом, диагностировать причину, внести минимальное изменение и проверить следующий запуск.</p>
+      <p>Например, агенты тратили много времени на запуск тестов. Внешне задача выглядела просто, но сессия становилась длинной, а контекст быстро заполнялся. Разбор показал, что агент запускал тесты одного Maven-модуля без <code>-am</code>. Проект использовал <code>${revision}</code> без flattened-maven-plugin, поэтому parent-pom не разрешался вне реактора. Получив ошибку, агент начинал полную сборку проекта.</p>
+      <p>Исправление заняло одну строку в <code>AGENTS.md</code>:</p>
       <pre><code>Для тестов одного Maven-модуля используй
 mvn -pl &lt;module&gt; -am test [-Dtest=...] \
   -Dsurefire.failIfNoSpecifiedTests=false;
 не заменяй локальную проверку полной сборкой.</code></pre>
-      <p>Одна строка в <code>AGENTS.md</code> изменила следующий запуск: вместо обращения к Central и сборки всего реактора — только родитель и нужные модули. Важна не сама строка про Maven, а путь: симптом → причина → минимальное изменение → проверка.</p>
-      <p class="note">Harness не должен только накапливаться. Часть сценариев со временем переходит в штатные инструменты агентов или веса модели. Ненужные слои стоит удалять.</p>
+      <p>Следующий запуск собрал только родителя и нужные модули. Ценна не строка о Maven сама по себе, а весь путь: долгий симптом превратился в конкретную причину, затем в изменение среды и, наконец, в другой результат.</p>
+      <p>Чтобы такие причины не зависели только от внимательности человека, я добавил саморефлексию в конце сессии. Агент перечисляет возникшие трудности, а повторяющиеся проблемы сохраняются. Это позволяет отличить единичный сбой от системного дефекта harness.</p>
+      <p>Но накопление не должно быть самоцелью. Со временем часть сценариев переходит в штатные возможности инструментов или в сами модели. Тогда внешний слой нужно упрощать. Harness — не музей прошлых ограничений.</p>
     </section>
 
-    <section id="attention">
-      <h2>Когда исполнение перестало быть главной проблемой</h2>
-      <p>Когда harness научился справляться с задачами разработки, реализация перестала быть узким местом. Понять, что именно нужно сделать, выбрать компромисс, спроектировать поддерживаемую систему и провести code review — здесь по-прежнему нужен человек.</p>
-      <p>Агенты помогают исследовать, изучать и структурировать. Но не несут ответственности за то, почему работа важна, чем пожертвовать и приемлем ли результат. Мы можем делегировать исполнение, но не понимание и суждение.</p>
-      <h3>Дебаг и багфикс</h3>
-      <p>Разбор дефектов почти всегда повторял один pipeline: идентификаторы и тайминг → логи и база → код, история коммитов, Confluence и Jira → вывод, дефект это или ожидаемое поведение.</p>
-      <p>Я переложил этот pipeline в скилл. На тестовом контуре агент через <code>agctl</code> получает доступ к параметрам, базе, логам, Kubernetes, Jira и Confluence. Для production-проблемы он воссоздаёт окружение и воспроизводит её. Я смотрю summary, но решение принимаю сам: пересылать агентное summary в bug report нельзя.</p>
-      <h3>Code review</h3>
-      <p>Чем автономнее агент, тем больше итоговый diff. Скилл <code>git-review-ladder</code> разбивает его на атомарные коммиты, где независимое изменение идёт вместе со своим тестом. Ревьюер идёт по diff как по лестнице, не строя маршрут заново.</p>
-      <p>Для комментариев к коду я использую <code>difit</code>: local-first GitHub-like-интерфейс позволяет оставить замечание в конкретном месте и отправить его агенту. Обсуждение остаётся привязанным к коду, а не превращается в длинное сообщение в чате.</p>
+    <section>
+      <h2>Узкое место перемещается к человеку</h2>
+      <p>Когда исполнение и верификация стали надёжнее, выяснилось, что реализация больше не является главным ограничением. Труднее оказалось понять, что именно нужно сделать, какой компромисс выбрать, как сохранить систему поддерживаемой и как принять результат.</p>
+      <p>Агент способен исследовать, сопоставлять варианты и структурировать информацию. Но ответственность за цель и жертвы остаётся на человеке. Передать бизнес-требования одним промптом и ожидать ответственного решения нельзя.</p>
+      <p>Поэтому harness нужен не только агенту. Человеку тоже нужна среда, которая забирает рутину и оставляет внимание для суждения.</p>
+      <p>Разбор дефектов — хороший пример. Моя последовательность почти всегда была одинаковой: запросить идентификаторы и время, посмотреть логи и базу, изучить код и историю коммитов, проверить Jira и Confluence, воспроизвести поведение и определить, является ли оно дефектом. Теперь этот процесс можно делегировать агенту с доступом к нужной инфраструктуре. Я читаю итоговое summary, но не пересылаю его автоматически в bug report: если систему знаю недостаточно, сначала должен сам понять происходящее.</p>
+      <p>Похожая задача возникает в code review. Чем дольше агент работает автономно, тем больше итоговый diff. Атомарные коммиты, где изменение идёт вместе со своим тестом, превращают ревью в последовательный маршрут. Локальный GitHub-like-интерфейс для комментариев помогает обсуждать конкретные места кода вместо длинного описания проблем в чате.</p>
+      <p>Эти изменения не устраняют человека из разработки. Они перемещают его усилия туда, где автоматизация не может нести ответственность: к намерению, пониманию и выбору.</p>
     </section>
 
-    <section id="conclusion" class="conclusion">
-      <h2>Ошибка становится опытом, только когда меняется следующий запуск</h2>
-      <p>Качество моделей увеличило объём вывода. Верификация позволила этому выводу доверять. И только пересмотр того, как мы работаем, вернул внимание к вещам, которые действительно его заслуживают.</p>
-      <p><strong>Стройте harness. Фокусируйтесь на важном. Делегируйте выполнение, чтобы оставалось время понять, что именно должно быть выполнено.</strong></p>
-      <p>Посмотрите на свою работу: что забирает ваше внимание, хотя не требует именно вашего решения?</p>
+    <section>
+      <h2>Что мы изменили на самом деле</h2>
+      <p>Рост качества моделей увеличил объём кода, который команда может получить. Сам по себе этот объём не делает разработку эффективнее. Верификация позволила доверять результату, а пересмотр рабочих процессов — не расплачиваться за него постоянным вмешательством.</p>
+      <p>Ошибка становится опытом не тогда, когда её исправили в текущей задаче. Она становится опытом, когда команда заметила её, поняла причину и изменила следующий запуск.</p>
+      <p>Поэтому полезно время от времени смотреть не на впечатляющие возможности агента, а на собственный рабочий день. Какие действия повторяются? Где приходится заново объяснять очевидное? Что забирает внимание, хотя не требует именно вашего решения?</p>
+      <p>Ответы на эти вопросы и есть наиболее реалистичная спецификация будущего harness.</p>
     </section>
 
-    <section class="resources" aria-labelledby="resources-title">
-      <h3 id="resources-title">Материалы и инструменты</h3>
+    <section class="references">
+      <h2>Ссылки</h2>
       <ul>
-        <li><a href="https://openai.com/index/harness-engineering/">OpenAI — Harness engineering</a></li>
+        <li><a href="https://openai.com/index/harness-engineering/">OpenAI — Harness engineering: Codex in an agent-first world</a></li>
         <li><a href="https://arxiv.org/abs/2602.11988">ETH Zurich — Evaluating AGENTS.md</a></li>
         <li><a href="https://github.com/HumanBean17/jarpeek">jarpeek</a> — просмотр исходного кода JVM-зависимостей</li>
         <li><a href="https://github.com/HumanBean17/jrag">jrag</a> — навигация по Java- и Kotlin-проектам</li>
-        <li><a href="https://github.com/HumanBean17/agctl">agctl</a> — контракт E2E-верификации</li>
+        <li><a href="https://github.com/HumanBean17/agctl">agctl</a> — интерфейс E2E-верификации</li>
       </ul>
     </section>
   </article>
-</div>
-<footer>
-  <div class="footer-inner">Дмитрий Теряев · Harness Engineering · <a href="https://github.com/HumanBean17/harness-engineering">Исходник статьи на GitHub</a></div>
-</footer>
+</main>
+<footer>Дмитрий Теряев · <a href="https://github.com/HumanBean17/harness-engineering">Исходник статьи на GitHub</a></footer>
 </body>
 </html>
